@@ -1118,14 +1118,16 @@ class AlarmClockCoordinator:
         )
 
         # Execute fallback if available
-        if alarm.data.script_fallback and script_entity_id != alarm.data.script_fallback:
+        # Use _get_effective_script to respect device defaults setting
+        effective_fallback = self._get_effective_script(alarm, "script_fallback")
+        if effective_fallback and script_entity_id != effective_fallback:
             _LOGGER.info(
                 "Executing fallback script for alarm %s",
                 alarm_id,
             )
             return await self._async_execute_script(
                 alarm_id,
-                self._get_effective_script(alarm, "script_fallback"),
+                effective_fallback,
                 "fallback",
             )
 
