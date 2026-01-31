@@ -6,6 +6,14 @@ directly instead of using _get_effective_script().
 """
 
 
+def get_effective_script(alarm_data, device_opts, script_attr):
+    """Simulates _get_effective_script logic."""
+    if not alarm_data["use_device_defaults"]:
+        return alarm_data.get(script_attr)
+    default_attr = f"default_{script_attr}"
+    return device_opts.get(default_attr)
+
+
 class TestFallbackScriptBug:
     """Test the fallback script bug with device defaults."""
 
@@ -44,17 +52,8 @@ class TestFallbackScriptBug:
         # Expected CORRECT behavior:
         # Should use _get_effective_script(alarm, "script_fallback")
         # This would return "script.fallback_device" from device_options
-        def get_effective_script(alarm_data, device_opts, script_attr):
-            """Simulates _get_effective_script logic."""
-            if not alarm_data["use_device_defaults"]:
-                return alarm_data.get(script_attr)
-            default_attr = f"default_{script_attr}"
-            return device_opts.get(default_attr)
-
         effective_fallback = get_effective_script(
-            alarm_data_use_defaults,
-            device_options,
-            "script_fallback"
+            alarm_data_use_defaults, device_options, "script_fallback"
         )
         assert effective_fallback == "script.fallback_device"
         correct_check = effective_fallback is not None
@@ -93,12 +92,6 @@ class TestFallbackScriptBug:
         # (buggy_comparison not used, just illustrating the bug)
 
         # CORRECT comparison
-        def get_effective_script(alarm_data, device_opts, script_attr):
-            if not alarm_data["use_device_defaults"]:
-                return alarm_data.get(script_attr)
-            default_attr = f"default_{script_attr}"
-            return device_opts.get(default_attr)
-
         effective_fallback = get_effective_script(alarm_data, device_options, "script_fallback")
         correct_comparison = failed_script_entity_id != effective_fallback
 
