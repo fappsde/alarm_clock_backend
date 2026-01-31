@@ -172,7 +172,7 @@ class TestDefaultScriptsConfigFlow:
         mock_entry.options[CONF_DEFAULT_SCRIPT_PRE_ALARM] = ""
         assert get_option(CONF_DEFAULT_SCRIPT_PRE_ALARM) is None
 
-    async def test_default_scripts_clear_field(self, hass: HomeAssistant):
+    async def test_default_scripts_clear_field(self):
         """Test that clearing a default script field removes it from options."""
         from custom_components.alarm_clock.const import (
             CONF_DEFAULT_SCRIPT_ALARM,
@@ -210,7 +210,7 @@ class TestDefaultScriptsConfigFlow:
         # Verify other settings are preserved
         assert updated_options["other_setting"] == "keep_this"
 
-    async def test_default_scripts_empty_string_not_saved(self, hass: HomeAssistant):
+    async def test_default_scripts_empty_string_not_saved(self):
         """Test that empty strings are not saved for default scripts."""
         from custom_components.alarm_clock.const import CONF_DEFAULT_SCRIPT_PRE_ALARM
 
