@@ -1,5 +1,4 @@
 """Test that default scripts save and load correctly through the entire flow."""
-from unittest.mock import MagicMock, Mock
 
 from custom_components.alarm_clock.const import (
     CONF_DEFAULT_SCRIPT_ALARM,
