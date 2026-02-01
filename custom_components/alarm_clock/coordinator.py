@@ -831,9 +831,10 @@ class AlarmClockCoordinator:
 
         await self.store.async_update_alarm(alarm.data)
 
-        # Cancel scheduled trigger
+        # Cancel scheduled trigger and clear next_trigger
         self._cancel_scheduled_callback(alarm_id)
         self._cancel_pre_alarm_callback(alarm_id)
+        alarm.next_trigger = None
 
         _LOGGER.info("Alarm %s - next occurrence will be skipped", alarm_id)
 
@@ -907,9 +908,10 @@ class AlarmClockCoordinator:
                 "on_arm",
             )
         else:
-            # Cancel callbacks
+            # Cancel callbacks and clear next_trigger
             self._cancel_scheduled_callback(alarm_id)
             self._cancel_pre_alarm_callback(alarm_id)
+            alarm.next_trigger = None
 
             # If currently active, execute cancel script
             if alarm.state in (AlarmState.RINGING, AlarmState.SNOOZED, AlarmState.PRE_ALARM):
