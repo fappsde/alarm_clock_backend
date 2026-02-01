@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     ATTR_ALARM_ID,
+    ATTR_ALARM_NAME,
     ATTR_ALARM_TIME,
     ATTR_DAYS,
     ATTR_DURATION,
@@ -53,6 +54,7 @@ from .const import (
     SERVICE_DELETE_ALARM,
     SERVICE_DISMISS,
     SERVICE_SET_DAYS,
+    SERVICE_SET_NAME,
     SERVICE_SET_SCRIPTS,
     SERVICE_SET_TIME,
     SERVICE_SKIP_NEXT,
@@ -1032,6 +1034,27 @@ class AlarmClockCoordinator:
         self._notify_update()
         return True
 
+    async def async_set_name(self, alarm_id: str, name: str) -> bool:
+        """Set alarm name."""
+        if alarm_id not in self._alarms:
+            return False
+
+        alarm = self._alarms[alarm_id]
+        old_name = alarm.data.name
+        alarm.data.name = name
+
+        await self.store.async_update_alarm(alarm.data)
+
+        # Fire event
+        event_data = alarm.get_event_data()
+        event_data["old_name"] = old_name
+        self._fire_event(AlarmEvent.NAME_CHANGED, event_data)
+
+        _LOGGER.info("Alarm %s renamed from '%s' to '%s'", alarm_id, old_name, name)
+
+        self._notify_update()
+        return True
+
     async def async_set_scripts(
         self,
         alarm_id: str,
@@ -1574,6 +1597,13 @@ class AlarmClockCoordinator:
             }
         )
 
+        set_name_schema = vol.Schema(
+            {
+                vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+                vol.Required(ATTR_ALARM_NAME): cv.string,
+            }
+        )
+
         create_alarm_schema = vol.Schema(
             {
                 vol.Required(CONF_ALARM_NAME): cv.string,
@@ -1744,6 +1774,25 @@ class AlarmClockCoordinator:
             except Exception as err:
                 _LOGGER.error("Error in set_days service: %s", err, exc_info=True)
 
+        async def handle_set_name(call: ServiceCall) -> None:
+            """Handle set name service call."""
+            try:
+                entity_id = call.data[ATTR_ENTITY_ID]
+                name = call.data[ATTR_ALARM_NAME]
+                _LOGGER.debug("handle_set_name called: entity_id=%s, name=%s", entity_id, name)
+                alarm_id = self._entity_id_to_alarm_id(entity_id)
+                if alarm_id:
+                    _LOGGER.debug("Resolved to alarm_id=%s, calling async_set_name", alarm_id)
+                    await self.async_set_name(alarm_id, name)
+                else:
+                    _LOGGER.error(
+                        "Failed to resolve entity_id %s to alarm_id. Available alarms: %s",
+                        entity_id,
+                        list(self._alarms.keys()),
+                    )
+            except Exception as err:
+                _LOGGER.error("Error in set_name service: %s", err, exc_info=True)
+
         async def handle_set_scripts(call: ServiceCall) -> None:
             """Handle set scripts service call."""
             try:
@@ -1847,6 +1896,10 @@ class AlarmClockCoordinator:
             self.hass.services.async_register(
                 DOMAIN, SERVICE_SET_DAYS, handle_set_days, schema=set_days_schema
             )
+        if not self.hass.services.has_service(DOMAIN, SERVICE_SET_NAME):
+            self.hass.services.async_register(
+                DOMAIN, SERVICE_SET_NAME, handle_set_name, schema=set_name_schema
+            )
         if not self.hass.services.has_service(DOMAIN, SERVICE_SET_SCRIPTS):
             self.hass.services.async_register(
                 DOMAIN, SERVICE_SET_SCRIPTS, handle_set_scripts, schema=set_scripts_schema
@@ -1892,6 +1945,7 @@ class AlarmClockCoordinator:
             SERVICE_TEST_ALARM,
             SERVICE_SET_TIME,
             SERVICE_SET_DAYS,
+            SERVICE_SET_NAME,
             SERVICE_SET_SCRIPTS,
             SERVICE_CREATE_ALARM,
             SERVICE_DELETE_ALARM,

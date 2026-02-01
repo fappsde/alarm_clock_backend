@@ -216,6 +216,10 @@
       "name": "Set Alarm Days",
       "description": "Set the days for an alarm to trigger."
     },
+    "set_name": {
+      "name": "Set Alarm Name",
+      "description": "Set the name for an alarm."
+    },
     "create_alarm": {
       "name": "Create Alarm",
       "description": "Create a new alarm."

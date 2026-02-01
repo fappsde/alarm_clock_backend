@@ -119,6 +119,25 @@ set_days:
             - saturday
             - sunday
 
+set_name:
+  name: Set Alarm Name
+  description: Set the name for an alarm
+  fields:
+    entity_id:
+      name: Entity
+      description: The alarm entity
+      required: true
+      selector:
+        entity:
+          domain: switch
+          integration: alarm_clock
+    alarm_name:
+      name: Name
+      description: The new name for the alarm
+      required: true
+      selector:
+        text:
+
 set_scripts:
   name: Set Alarm Scripts
   description: Configure scripts for an alarm

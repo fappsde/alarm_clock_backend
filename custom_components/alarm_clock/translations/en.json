@@ -287,6 +287,20 @@
         }
       }
     },
+    "set_name": {
+      "name": "Set Alarm Name",
+      "description": "Set the name for an alarm.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "The alarm entity."
+        },
+        "alarm_name": {
+          "name": "Name",
+          "description": "The new name for the alarm."
+        }
+      }
+    },
     "create_alarm": {
       "name": "Create Alarm",
       "description": "Create a new alarm.",

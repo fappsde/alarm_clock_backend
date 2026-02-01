@@ -287,6 +287,20 @@
         }
       }
     },
+    "set_name": {
+      "name": "Alarmname setzen",
+      "description": "Den Namen für einen Alarm festlegen.",
+      "fields": {
+        "entity_id": {
+          "name": "Entität",
+          "description": "Die Alarm-Entität."
+        },
+        "alarm_name": {
+          "name": "Name",
+          "description": "Der neue Name für den Alarm."
+        }
+      }
+    },
     "create_alarm": {
       "name": "Alarm erstellen",
       "description": "Einen neuen Alarm erstellen.",

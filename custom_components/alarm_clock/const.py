@@ -143,6 +143,7 @@ class AlarmEvent(StrEnum):
     SCRIPT_FAILED = f"{DOMAIN}_script_failed"
     HEALTH_WARNING = f"{DOMAIN}_health_warning"
     TIME_CHANGED = f"{DOMAIN}_time_changed"
+    NAME_CHANGED = f"{DOMAIN}_name_changed"
 
 
 # Services
@@ -156,6 +157,7 @@ SERVICE_SET_DAYS: Final = "set_days"
 SERVICE_SET_SCRIPTS: Final = "set_scripts"
 SERVICE_CREATE_ALARM: Final = "create_alarm"
 SERVICE_DELETE_ALARM: Final = "delete_alarm"
+SERVICE_SET_NAME: Final = "set_name"
 
 # Attributes
 ATTR_ALARM_ID: Final = "alarm_id"
