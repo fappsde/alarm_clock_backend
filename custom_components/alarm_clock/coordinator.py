@@ -139,6 +139,17 @@ class AlarmClockCoordinator:
         _LOGGER.info("Starting alarm clock coordinator")
         self._running = True
 
+        # Log current config entry options for debugging
+        _LOGGER.info(
+            "Config entry options at startup: %s",
+            dict(self.entry.options) if self.entry.options else "EMPTY",
+        )
+        default_script_keys = [k for k in self.entry.options.keys() if k.startswith("default_")]
+        _LOGGER.info(
+            "Default script keys in options: %s",
+            default_script_keys if default_script_keys else "NONE",
+        )
+
         try:
             # Load alarms from store
             alarms_to_load = self.store.get_all_alarms()
@@ -242,6 +253,19 @@ class AlarmClockCoordinator:
         # Update the entry reference to get the latest options
         self.entry = entry
 
+        # Log the new options for debugging
+        _LOGGER.info(
+            "New config entry options after update: %s",
+            dict(entry.options) if entry.options else "EMPTY",
+        )
+        default_script_keys = {
+            k: v for k, v in entry.options.items() if k.startswith("default_script_")
+        }
+        _LOGGER.info(
+            "Default scripts in new options: %s",
+            default_script_keys if default_script_keys else "NONE",
+        )
+
         # Count how many alarms use device defaults
         alarms_using_defaults = [
             alarm_id
@@ -323,6 +347,22 @@ class AlarmClockCoordinator:
                     # State machine will use default state
 
             self._alarms[alarm_data.alarm_id] = alarm
+
+            # Log the alarm's script configuration for debugging
+            if alarm_data.use_device_defaults:
+                _LOGGER.info(
+                    "Alarm %s loaded with use_device_defaults=True, "
+                    "will use scripts from config entry options",
+                    alarm_data.alarm_id,
+                )
+            else:
+                _LOGGER.info(
+                    "Alarm %s loaded with use_device_defaults=False, "
+                    "script_alarm=%s, script_pre_alarm=%s",
+                    alarm_data.alarm_id,
+                    alarm_data.script_alarm,
+                    alarm_data.script_pre_alarm,
+                )
 
             # Schedule if armed
             if alarm.state == AlarmState.ARMED:
@@ -580,9 +620,16 @@ class AlarmClockCoordinator:
         self._fire_event(AlarmEvent.TRIGGERED, alarm.get_event_data())
 
         # Execute alarm script
+        effective_script = self._get_effective_script(alarm, "script_alarm")
+        _LOGGER.info(
+            "Alarm trigger for %s: use_device_defaults=%s, effective_script_alarm=%s",
+            alarm_id,
+            alarm.data.use_device_defaults,
+            effective_script,
+        )
         await self._async_execute_script(
             alarm_id,
-            self._get_effective_script(alarm, "script_alarm"),
+            effective_script,
             "alarm",
         )
 
@@ -622,9 +669,16 @@ class AlarmClockCoordinator:
         self._fire_event(AlarmEvent.PRE_ALARM, alarm.get_event_data())
 
         # Execute pre-alarm script
+        effective_script = self._get_effective_script(alarm, "script_pre_alarm")
+        _LOGGER.info(
+            "Pre-alarm for %s: use_device_defaults=%s, effective_script_pre_alarm=%s",
+            alarm_id,
+            alarm.data.use_device_defaults,
+            effective_script,
+        )
         await self._async_execute_script(
             alarm_id,
-            self._get_effective_script(alarm, "script_pre_alarm"),
+            effective_script,
             "pre_alarm",
         )
 
@@ -1034,24 +1088,41 @@ class AlarmClockCoordinator:
         """Get the effective script for an alarm based on device defaults setting."""
         if not alarm.data.use_device_defaults:
             # Use alarm-specific scripts
-            return getattr(alarm.data, script_attr)
+            script = getattr(alarm.data, script_attr)
+            _LOGGER.debug(
+                "Alarm %s uses per-alarm scripts, %s = %s",
+                alarm.data.alarm_id,
+                script_attr,
+                script,
+            )
+            return script
 
         # Use device-level defaults from config entry options
         options = self.entry.options
         default_attr = f"default_{script_attr}"
-        return options.get(default_attr)
+        script = options.get(default_attr)
+        _LOGGER.debug(
+            "Alarm %s uses device defaults, looking for %s in options: %s (available keys: %s)",
+            alarm.data.alarm_id,
+            default_attr,
+            script,
+            [k for k in options.keys() if k.startswith("default_")],
+        )
+        return script
 
     def _get_effective_script_timeout(self, alarm: AlarmStateMachine) -> int:
         """Get the effective script timeout."""
         if not alarm.data.use_device_defaults:
-            return alarm.data.script_timeout
-        return self.entry.options.get("default_script_timeout", 30)
+            return int(alarm.data.script_timeout)
+        # Options from number selector may be float, convert to int
+        return int(self.entry.options.get("default_script_timeout", 30))
 
     def _get_effective_script_retry_count(self, alarm: AlarmStateMachine) -> int:
         """Get the effective script retry count."""
         if not alarm.data.use_device_defaults:
-            return alarm.data.script_retry_count
-        return self.entry.options.get("default_script_retry_count", 3)
+            return int(alarm.data.script_retry_count)
+        # Options from number selector may be float, convert to int
+        return int(self.entry.options.get("default_script_retry_count", 3))
 
     def get_alarm_scripts_info(self, alarm: AlarmStateMachine) -> dict[str, Any]:
         """Get all effective scripts and their sources for an alarm.
@@ -1091,11 +1162,28 @@ class AlarmClockCoordinator:
     ) -> bool:
         """Execute a script with retry and timeout."""
         if not script_entity_id:
+            _LOGGER.debug(
+                "No %s script configured for alarm %s, skipping execution",
+                script_type,
+                alarm_id,
+            )
             return True
 
         alarm = self._alarms.get(alarm_id)
         if not alarm:
+            _LOGGER.warning(
+                "Alarm %s not found when trying to execute %s script",
+                alarm_id,
+                script_type,
+            )
             return False
+
+        _LOGGER.info(
+            "Starting execution of %s script '%s' for alarm %s",
+            script_type,
+            script_entity_id,
+            alarm_id,
+        )
 
         timeout = self._get_effective_script_timeout(alarm)
         max_retries = self._get_effective_script_retry_count(alarm)
