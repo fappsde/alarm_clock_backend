@@ -157,6 +157,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 hass.data[DOMAIN].pop(entry.entry_id)
             return False
 
+        # Register an update listener for options changes
+        # This ensures entities refresh their attributes when default scripts change
+        entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+
         # Validate referenced entities after startup
         await coordinator.async_validate_entities()
 
@@ -172,6 +176,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
             hass.data[DOMAIN].pop(entry.entry_id)
         return False
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update - notify entities to refresh their state."""
+    _LOGGER.debug("Options updated for entry %s, notifying entities", entry.entry_id)
+    coordinator: AlarmClockCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if coordinator:
+        # Trigger entity state refresh by calling _notify_update
+        # This makes entities re-read their attributes (including effective scripts)
+        coordinator._notify_update()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

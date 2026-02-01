@@ -121,6 +121,9 @@ class AlarmClockCoordinator:
         # Track if this coordinator registered the services
         self._services_registered = False
 
+        # Listener for config entry option updates (for device default scripts)
+        self._options_update_listener: CALLBACK_TYPE | None = None
+
     @property
     def alarms(self) -> dict[str, AlarmStateMachine]:
         """Get all alarms."""
@@ -161,6 +164,12 @@ class AlarmClockCoordinator:
             # Start health check
             _LOGGER.debug("Starting health check")
             self._schedule_health_check()
+
+            # Register listener for config entry option updates (device default scripts)
+            self._options_update_listener = self.entry.add_update_listener(
+                self._async_handle_options_update
+            )
+            _LOGGER.debug("Registered config entry options update listener")
 
             _LOGGER.info(
                 "Alarm clock coordinator started successfully with %d alarms", len(self._alarms)
@@ -207,12 +216,63 @@ class AlarmClockCoordinator:
         # Unregister services if this is the last entry
         await self.async_unregister_services()
 
+        # Remove config entry options update listener
+        if self._options_update_listener:
+            self._options_update_listener()
+            self._options_update_listener = None
+
         # Clear update callbacks to prevent memory leaks (thread-safe)
         with self._callback_lock:
             self._update_callbacks.clear()
             self._entity_adder_callbacks.clear()
 
         _LOGGER.info("Alarm clock coordinator stopped")
+
+    async def _async_handle_options_update(
+        self, hass: HomeAssistant, entry: ConfigEntry
+    ) -> None:
+        """Handle config entry options update (e.g., device default scripts changed).
+
+        This method is called when the config entry options are updated.
+        It notifies all alarms that use device defaults to refresh their state,
+        ensuring they use the updated default scripts.
+        """
+        _LOGGER.debug("Config entry options updated, refreshing alarms using device defaults")
+
+        # Update the entry reference to get the latest options
+        self.entry = entry
+
+        # Count how many alarms use device defaults
+        alarms_using_defaults = [
+            alarm_id
+            for alarm_id, alarm in self._alarms.items()
+            if alarm.data.use_device_defaults
+        ]
+
+        if alarms_using_defaults:
+            _LOGGER.info(
+                "Updating %d alarms that use device default scripts: %s",
+                len(alarms_using_defaults),
+                alarms_using_defaults,
+            )
+
+            # Fire an event to notify about the default scripts update
+            self._fire_event(
+                AlarmEvent.HEALTH_WARNING,
+                {
+                    "message": "Device default scripts updated",
+                    "affected_alarms": alarms_using_defaults,
+                },
+            )
+
+        # Notify all entities to refresh their state
+        # This will cause entities to re-read their effective scripts
+        self._notify_update()
+
+        _LOGGER.debug(
+            "Options update handled, notified %d alarms using device defaults",
+            len(alarms_using_defaults),
+        )
 
     async def _async_setup_alarm(self, alarm_data: AlarmData) -> None:
         """Set up a single alarm."""
