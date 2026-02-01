@@ -47,12 +47,21 @@
           "max_snooze_count": "Maximale Schlummeranzahl",
           "auto_dismiss_timeout": "Automatische Abschaltung (Minuten)",
           "pre_alarm_duration": "Voralarm-Dauer (Minuten)",
-          "use_device_defaults": "Geräte-Standardwerte verwenden",
+          "use_device_defaults": "Geräte-Standardwerte verwenden"
+        }
+      },
+      "alarm_scripts": {
+        "title": "Alarm-Skripte",
+        "description": "Konfigurieren Sie Skripte für diesen Alarm.",
+        "data": {
           "script_pre_alarm": "Voralarm-Skript",
           "script_alarm": "Alarm-Skript",
           "script_post_alarm": "Nach-Alarm-Skript",
           "script_on_snooze": "Schlummer-Skript",
           "script_on_dismiss": "Abschalt-Skript",
+          "script_on_arm": "Aktivierungs-Skript",
+          "script_on_cancel": "Abbruch-Skript",
+          "script_on_skip": "Überspringen-Skript",
           "script_fallback": "Fallback-Skript",
           "script_timeout": "Skript-Timeout (Sekunden)",
           "script_retry_count": "Skript-Wiederholungen"
@@ -82,7 +91,25 @@
           "snooze_duration": "Schlummerdauer (Minuten)",
           "max_snooze_count": "Maximale Schlummeranzahl",
           "auto_dismiss_timeout": "Automatische Abschaltung (Minuten)",
-          "pre_alarm_duration": "Voralarm-Dauer (Minuten)"
+          "pre_alarm_duration": "Voralarm-Dauer (Minuten)",
+          "use_device_defaults": "Geräte-Standardwerte verwenden"
+        }
+      },
+      "edit_alarm_scripts": {
+        "title": "Alarm-Skripte bearbeiten",
+        "description": "Konfigurieren Sie Skripte für diesen Alarm.",
+        "data": {
+          "script_pre_alarm": "Voralarm-Skript",
+          "script_alarm": "Alarm-Skript",
+          "script_post_alarm": "Nach-Alarm-Skript",
+          "script_on_snooze": "Schlummer-Skript",
+          "script_on_dismiss": "Abschalt-Skript",
+          "script_on_arm": "Aktivierungs-Skript",
+          "script_on_cancel": "Abbruch-Skript",
+          "script_on_skip": "Überspringen-Skript",
+          "script_fallback": "Fallback-Skript",
+          "script_timeout": "Skript-Timeout (Sekunden)",
+          "script_retry_count": "Skript-Wiederholungen"
         }
       },
       "default_scripts": {

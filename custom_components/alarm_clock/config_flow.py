@@ -130,7 +130,7 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
         # Note: self.config_entry is automatically set by the base class
         self._alarm_data: dict[str, Any] = {}
 
-    def _build_advanced_schema(self, use_defaults: bool) -> vol.Schema:
+    def _build_advanced_schema(self) -> vol.Schema:
         """Build the advanced alarm settings schema."""
         schema_dict = {
             vol.Optional(
@@ -176,54 +176,83 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
             vol.Optional(CONF_USE_DEVICE_DEFAULTS, default=True): selector.BooleanSelector(),
         }
 
-        # Only show individual script fields if NOT using device defaults
-        if not use_defaults:
-            schema_dict.update(
-                {
-                    vol.Optional(CONF_SCRIPT_PRE_ALARM): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="script")
-                    ),
-                    vol.Optional(CONF_SCRIPT_ALARM): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="script")
-                    ),
-                    vol.Optional(CONF_SCRIPT_POST_ALARM): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="script")
-                    ),
-                    vol.Optional(CONF_SCRIPT_ON_SNOOZE): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="script")
-                    ),
-                    vol.Optional(CONF_SCRIPT_ON_DISMISS): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="script")
-                    ),
-                    vol.Optional(CONF_SCRIPT_FALLBACK): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="script")
-                    ),
-                    vol.Optional(
-                        CONF_SCRIPT_TIMEOUT, default=DEFAULT_SCRIPT_TIMEOUT
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=1,
-                            max=300,
-                            step=1,
-                            unit_of_measurement="seconds",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_SCRIPT_RETRY_COUNT, default=DEFAULT_SCRIPT_RETRY_COUNT
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0, max=10, step=1, mode=selector.NumberSelectorMode.BOX
-                        )
-                    ),
-                }
-            )
-
         return vol.Schema(schema_dict)
 
-    def _build_edit_alarm_schema(
-        self, alarm: AlarmStateMachine, use_defaults: bool | None = None
+    def _build_alarm_scripts_schema(
+        self,
+        script_pre_alarm: str | None = None,
+        script_alarm: str | None = None,
+        script_post_alarm: str | None = None,
+        script_on_snooze: str | None = None,
+        script_on_dismiss: str | None = None,
+        script_on_arm: str | None = None,
+        script_on_cancel: str | None = None,
+        script_on_skip: str | None = None,
+        script_fallback: str | None = None,
+        script_timeout: int = DEFAULT_SCRIPT_TIMEOUT,
+        script_retry_count: int = DEFAULT_SCRIPT_RETRY_COUNT,
     ) -> vol.Schema:
+        """Build the alarm scripts schema."""
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_SCRIPT_PRE_ALARM,
+                    description={"suggested_value": script_pre_alarm},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
+                vol.Optional(
+                    CONF_SCRIPT_ALARM,
+                    description={"suggested_value": script_alarm},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
+                vol.Optional(
+                    CONF_SCRIPT_POST_ALARM,
+                    description={"suggested_value": script_post_alarm},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
+                vol.Optional(
+                    CONF_SCRIPT_ON_SNOOZE,
+                    description={"suggested_value": script_on_snooze},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
+                vol.Optional(
+                    CONF_SCRIPT_ON_DISMISS,
+                    description={"suggested_value": script_on_dismiss},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
+                vol.Optional(
+                    CONF_SCRIPT_ON_ARM,
+                    description={"suggested_value": script_on_arm},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
+                vol.Optional(
+                    CONF_SCRIPT_ON_CANCEL,
+                    description={"suggested_value": script_on_cancel},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
+                vol.Optional(
+                    CONF_SCRIPT_ON_SKIP,
+                    description={"suggested_value": script_on_skip},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
+                vol.Optional(
+                    CONF_SCRIPT_FALLBACK,
+                    description={"suggested_value": script_fallback},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
+                vol.Optional(
+                    CONF_SCRIPT_TIMEOUT, default=script_timeout
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1,
+                        max=300,
+                        step=1,
+                        unit_of_measurement="seconds",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional(
+                    CONF_SCRIPT_RETRY_COUNT, default=script_retry_count
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0, max=10, step=1, mode=selector.NumberSelectorMode.BOX
+                    )
+                ),
+            }
+        )
+
+    def _build_edit_alarm_schema(self, alarm: AlarmStateMachine) -> vol.Schema:
         """Build the edit alarm schema with current values."""
         # Parse current time
         try:
@@ -231,10 +260,6 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
             current_time = {"hours": hour, "minutes": minute}
         except (ValueError, AttributeError):
             current_time = {"hours": 7, "minutes": 0}
-
-        # Use provided use_defaults or fall back to alarm's current setting
-        if use_defaults is None:
-            use_defaults = alarm.data.use_device_defaults
 
         schema_dict = {
             vol.Required(CONF_ALARM_NAME, default=alarm.data.name): cv.string,
@@ -262,67 +287,6 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
                 CONF_USE_DEVICE_DEFAULTS, default=alarm.data.use_device_defaults
             ): selector.BooleanSelector(),
         }
-
-        # Only show individual script fields if NOT using device defaults
-        if not use_defaults:
-            schema_dict.update(
-                {
-                    vol.Optional(
-                        CONF_SCRIPT_PRE_ALARM,
-                        description={"suggested_value": alarm.data.script_pre_alarm},
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
-                    vol.Optional(
-                        CONF_SCRIPT_ALARM,
-                        description={"suggested_value": alarm.data.script_alarm},
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
-                    vol.Optional(
-                        CONF_SCRIPT_POST_ALARM,
-                        description={"suggested_value": alarm.data.script_post_alarm},
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
-                    vol.Optional(
-                        CONF_SCRIPT_ON_SNOOZE,
-                        description={"suggested_value": alarm.data.script_on_snooze},
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
-                    vol.Optional(
-                        CONF_SCRIPT_ON_DISMISS,
-                        description={"suggested_value": alarm.data.script_on_dismiss},
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
-                    vol.Optional(
-                        CONF_SCRIPT_ON_ARM,
-                        description={"suggested_value": alarm.data.script_on_arm},
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
-                    vol.Optional(
-                        CONF_SCRIPT_ON_CANCEL,
-                        description={"suggested_value": alarm.data.script_on_cancel},
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
-                    vol.Optional(
-                        CONF_SCRIPT_ON_SKIP,
-                        description={"suggested_value": alarm.data.script_on_skip},
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
-                    vol.Optional(
-                        CONF_SCRIPT_FALLBACK,
-                        description={"suggested_value": alarm.data.script_fallback},
-                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="script")),
-                    vol.Optional(
-                        CONF_SCRIPT_TIMEOUT, default=alarm.data.script_timeout
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=1,
-                            max=300,
-                            step=1,
-                            unit_of_measurement="seconds",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_SCRIPT_RETRY_COUNT, default=alarm.data.script_retry_count
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0, max=10, step=1, mode=selector.NumberSelectorMode.BOX
-                        )
-                    ),
-                }
-            )
 
         return vol.Schema(schema_dict)
 
@@ -383,31 +347,26 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Check if use_device_defaults toggle was changed
-            current_use_defaults = user_input.get(CONF_USE_DEVICE_DEFAULTS, True)
-            previous_use_defaults = self._alarm_data.get(CONF_USE_DEVICE_DEFAULTS, True)
+            # Validate numeric fields
+            numeric_validations = {
+                CONF_SNOOZE_DURATION: (1, 60),
+                CONF_MAX_SNOOZE_COUNT: (0, 10),
+                CONF_AUTO_DISMISS_TIMEOUT: (1, 180),
+                CONF_PRE_ALARM_DURATION: (0, 60),
+            }
 
-            if current_use_defaults != previous_use_defaults:
-                # Toggle changed - update stored data and re-show form with new schema
-                self._alarm_data[CONF_USE_DEVICE_DEFAULTS] = current_use_defaults
-                # Preserve other fields that were filled in, including script selections
-                for key in [
-                    CONF_SNOOZE_DURATION,
-                    CONF_MAX_SNOOZE_COUNT,
-                    CONF_AUTO_DISMISS_TIMEOUT,
-                    CONF_PRE_ALARM_DURATION,
-                    CONF_SCRIPT_TIMEOUT,
-                    CONF_SCRIPT_RETRY_COUNT,
-                    CONF_SCRIPT_PRE_ALARM,
-                    CONF_SCRIPT_ALARM,
-                    CONF_SCRIPT_POST_ALARM,
-                    CONF_SCRIPT_ON_SNOOZE,
-                    CONF_SCRIPT_ON_DISMISS,
-                    CONF_SCRIPT_FALLBACK,
-                ]:
-                    if key in user_input:
-                        self._alarm_data[key] = user_input[key]
+            for field, (min_val, max_val) in numeric_validations.items():
+                if field in user_input:
+                    try:
+                        user_input[field] = validate_duration(
+                            user_input[field], field, min_val, max_val
+                        )
+                    except ValidationError as err:
+                        _LOGGER.debug("Validation failed for %s: %s", field, err)
+                        errors[field] = "invalid_value"
 
+            if errors:
+                # Re-show form with errors
                 alarm_name = self._alarm_data.get(CONF_ALARM_NAME, "New Alarm")
                 return self.async_show_form(
                     step_id="alarm_advanced",
@@ -415,15 +374,42 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
                         "alarm_name": alarm_name,
                         "info": "Configure advanced alarm settings. If 'Use Device Defaults' is enabled, the alarm will use the device-level default scripts configured in Settings → Default Scripts.",
                     },
-                    data_schema=self._build_advanced_schema(current_use_defaults),
+                    data_schema=self._build_advanced_schema(),
+                    errors=errors,
                 )
 
+            # Merge with basic alarm data
+            self._alarm_data.update(user_input)
+
+            # Check if we need to show scripts page
+            use_device_defaults = user_input.get(CONF_USE_DEVICE_DEFAULTS, True)
+
+            if not use_device_defaults:
+                # Go to scripts configuration page
+                return await self.async_step_alarm_scripts()
+
+            # Using device defaults - create the alarm directly
+            return await self._async_create_alarm()
+
+        alarm_name = self._alarm_data.get(CONF_ALARM_NAME, "New Alarm")
+        return self.async_show_form(
+            step_id="alarm_advanced",
+            description_placeholders={
+                "alarm_name": alarm_name,
+                "info": "Configure advanced alarm settings. If 'Use Device Defaults' is enabled, the alarm will use the device-level default scripts configured in Settings → Default Scripts.",
+            },
+            data_schema=self._build_advanced_schema(),
+        )
+
+    async def async_step_alarm_scripts(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle alarm scripts configuration."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
             # Validate numeric fields
             numeric_validations = {
-                CONF_SNOOZE_DURATION: (1, 60),
-                CONF_MAX_SNOOZE_COUNT: (0, 10),
-                CONF_AUTO_DISMISS_TIMEOUT: (1, 180),
-                CONF_PRE_ALARM_DURATION: (0, 60),
                 CONF_SCRIPT_TIMEOUT: (1, 300),
                 CONF_SCRIPT_RETRY_COUNT: (0, 10),
             }
@@ -439,120 +425,129 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
                         errors[field] = "invalid_value"
 
             if errors:
-                # Re-show form with errors
-                # Read use_defaults from user_input to reflect the current toggle state
-                use_defaults = user_input.get(CONF_USE_DEVICE_DEFAULTS, True)
                 alarm_name = self._alarm_data.get(CONF_ALARM_NAME, "New Alarm")
                 return self.async_show_form(
-                    step_id="alarm_advanced",
+                    step_id="alarm_scripts",
                     description_placeholders={
                         "alarm_name": alarm_name,
-                        "info": "Configure advanced alarm settings. If 'Use Device Defaults' is enabled, the alarm will use the device-level default scripts configured in Settings → Default Scripts.",
+                        "info": "Configure scripts for this alarm.",
                     },
-                    data_schema=self._build_advanced_schema(use_defaults),
+                    data_schema=self._build_alarm_scripts_schema(),
                     errors=errors,
                 )
 
-            # Merge with basic alarm data
-            alarm_data = {**self._alarm_data, **user_input}
+            # Merge script data with alarm data
+            self._alarm_data.update(user_input)
 
-            # Add the alarm via coordinator
-            coordinator = self.hass.data[DOMAIN].get(self.config_entry.entry_id)
-            if coordinator:
-                import uuid
-
-                from .state_machine import AlarmData
-
-                alarm_id = f"alarm_{uuid.uuid4().hex[:8]}"
-
-                # Convert time selector output to HH:MM string
-                time_value = alarm_data[CONF_ALARM_TIME]
-                if isinstance(time_value, dict):
-                    time_str = (
-                        f"{time_value.get('hours', 0):02d}:{time_value.get('minutes', 0):02d}"
-                    )
-                else:
-                    # Handle "HH:MM" or "HH:MM:SS" format - only keep HH:MM
-                    time_parts = str(time_value).split(":")
-                    time_str = f"{int(time_parts[0]):02d}:{int(time_parts[1]):02d}"
-
-                # Determine if using device defaults
-                use_device_defaults = alarm_data.get(CONF_USE_DEVICE_DEFAULTS, True)
-
-                # If using device defaults, don't set individual scripts
-                # The coordinator will use device-level defaults instead
-                if use_device_defaults:
-                    script_pre_alarm = None
-                    script_alarm = None
-                    script_post_alarm = None
-                    script_on_snooze = None
-                    script_on_dismiss = None
-                    script_fallback = None
-                    script_timeout = DEFAULT_SCRIPT_TIMEOUT
-                    script_retry_count = DEFAULT_SCRIPT_RETRY_COUNT
-                else:
-                    # Use alarm-specific scripts from form
-                    script_pre_alarm = alarm_data.get(CONF_SCRIPT_PRE_ALARM)
-                    script_alarm = alarm_data.get(CONF_SCRIPT_ALARM)
-                    script_post_alarm = alarm_data.get(CONF_SCRIPT_POST_ALARM)
-                    script_on_snooze = alarm_data.get(CONF_SCRIPT_ON_SNOOZE)
-                    script_on_dismiss = alarm_data.get(CONF_SCRIPT_ON_DISMISS)
-                    script_fallback = alarm_data.get(CONF_SCRIPT_FALLBACK)
-                    script_timeout = alarm_data.get(CONF_SCRIPT_TIMEOUT, DEFAULT_SCRIPT_TIMEOUT)
-                    script_retry_count = alarm_data.get(
-                        CONF_SCRIPT_RETRY_COUNT, DEFAULT_SCRIPT_RETRY_COUNT
-                    )
-
-                new_alarm = AlarmData(
-                    alarm_id=alarm_id,
-                    name=alarm_data[CONF_ALARM_NAME],
-                    time=time_str,
-                    days=alarm_data.get(CONF_DAYS, WEEKDAYS[:5]),
-                    one_time=alarm_data.get(CONF_ONE_TIME, False),
-                    enabled=alarm_data.get(CONF_ENABLED, True),
-                    snooze_duration=alarm_data.get(CONF_SNOOZE_DURATION, DEFAULT_SNOOZE_DURATION),
-                    max_snooze_count=alarm_data.get(
-                        CONF_MAX_SNOOZE_COUNT, DEFAULT_MAX_SNOOZE_COUNT
-                    ),
-                    auto_dismiss_timeout=alarm_data.get(
-                        CONF_AUTO_DISMISS_TIMEOUT, DEFAULT_AUTO_DISMISS_TIMEOUT
-                    ),
-                    pre_alarm_duration=alarm_data.get(
-                        CONF_PRE_ALARM_DURATION, DEFAULT_PRE_ALARM_DURATION
-                    ),
-                    use_device_defaults=use_device_defaults,
-                    script_pre_alarm=script_pre_alarm,
-                    script_alarm=script_alarm,
-                    script_post_alarm=script_post_alarm,
-                    script_on_snooze=script_on_snooze,
-                    script_on_dismiss=script_on_dismiss,
-                    script_fallback=script_fallback,
-                    script_timeout=script_timeout,
-                    script_retry_count=script_retry_count,
-                )
-                try:
-                    await coordinator.async_add_alarm(new_alarm)
-                except Exception as err:
-                    _LOGGER.error("Error adding alarm: %s", err, exc_info=True)
-                    return self.async_abort(reason="add_alarm_failed")
-
-            # Clear the alarm data after successful submission
-            self._alarm_data = {}
-
-            return self.async_create_entry(title="", data={})
-
-        # Build schema using helper method
-        use_defaults = self._alarm_data.get(CONF_USE_DEVICE_DEFAULTS, True)
+            # Create the alarm
+            return await self._async_create_alarm()
 
         alarm_name = self._alarm_data.get(CONF_ALARM_NAME, "New Alarm")
         return self.async_show_form(
-            step_id="alarm_advanced",
+            step_id="alarm_scripts",
             description_placeholders={
                 "alarm_name": alarm_name,
-                "info": "Configure advanced alarm settings. If 'Use Device Defaults' is enabled, the alarm will use the device-level default scripts configured in Settings → Default Scripts.",
+                "info": "Configure scripts for this alarm.",
             },
-            data_schema=self._build_advanced_schema(use_defaults),
+            data_schema=self._build_alarm_scripts_schema(),
         )
+
+    async def _async_create_alarm(self) -> FlowResult:
+        """Create a new alarm from the stored alarm data."""
+        alarm_data = self._alarm_data
+
+        coordinator = self.hass.data[DOMAIN].get(self.config_entry.entry_id)
+        if coordinator:
+            import uuid
+
+            from .state_machine import AlarmData
+
+            alarm_id = f"alarm_{uuid.uuid4().hex[:8]}"
+
+            # Convert time selector output to HH:MM string
+            time_value = alarm_data[CONF_ALARM_TIME]
+            if isinstance(time_value, dict):
+                time_str = (
+                    f"{time_value.get('hours', 0):02d}:{time_value.get('minutes', 0):02d}"
+                )
+            else:
+                # Handle "HH:MM" or "HH:MM:SS" format - only keep HH:MM
+                time_parts = str(time_value).split(":")
+                time_str = f"{int(time_parts[0]):02d}:{int(time_parts[1]):02d}"
+
+            # Determine if using device defaults
+            use_device_defaults = alarm_data.get(CONF_USE_DEVICE_DEFAULTS, True)
+
+            # If using device defaults, don't set individual scripts
+            if use_device_defaults:
+                script_pre_alarm = None
+                script_alarm = None
+                script_post_alarm = None
+                script_on_snooze = None
+                script_on_dismiss = None
+                script_on_arm = None
+                script_on_cancel = None
+                script_on_skip = None
+                script_fallback = None
+                script_timeout = DEFAULT_SCRIPT_TIMEOUT
+                script_retry_count = DEFAULT_SCRIPT_RETRY_COUNT
+            else:
+                # Use alarm-specific scripts from form
+                script_pre_alarm = alarm_data.get(CONF_SCRIPT_PRE_ALARM)
+                script_alarm = alarm_data.get(CONF_SCRIPT_ALARM)
+                script_post_alarm = alarm_data.get(CONF_SCRIPT_POST_ALARM)
+                script_on_snooze = alarm_data.get(CONF_SCRIPT_ON_SNOOZE)
+                script_on_dismiss = alarm_data.get(CONF_SCRIPT_ON_DISMISS)
+                script_on_arm = alarm_data.get(CONF_SCRIPT_ON_ARM)
+                script_on_cancel = alarm_data.get(CONF_SCRIPT_ON_CANCEL)
+                script_on_skip = alarm_data.get(CONF_SCRIPT_ON_SKIP)
+                script_fallback = alarm_data.get(CONF_SCRIPT_FALLBACK)
+                script_timeout = alarm_data.get(CONF_SCRIPT_TIMEOUT, DEFAULT_SCRIPT_TIMEOUT)
+                script_retry_count = alarm_data.get(
+                    CONF_SCRIPT_RETRY_COUNT, DEFAULT_SCRIPT_RETRY_COUNT
+                )
+
+            new_alarm = AlarmData(
+                alarm_id=alarm_id,
+                name=alarm_data[CONF_ALARM_NAME],
+                time=time_str,
+                days=alarm_data.get(CONF_DAYS, WEEKDAYS[:5]),
+                one_time=alarm_data.get(CONF_ONE_TIME, False),
+                enabled=alarm_data.get(CONF_ENABLED, True),
+                snooze_duration=alarm_data.get(CONF_SNOOZE_DURATION, DEFAULT_SNOOZE_DURATION),
+                max_snooze_count=alarm_data.get(
+                    CONF_MAX_SNOOZE_COUNT, DEFAULT_MAX_SNOOZE_COUNT
+                ),
+                auto_dismiss_timeout=alarm_data.get(
+                    CONF_AUTO_DISMISS_TIMEOUT, DEFAULT_AUTO_DISMISS_TIMEOUT
+                ),
+                pre_alarm_duration=alarm_data.get(
+                    CONF_PRE_ALARM_DURATION, DEFAULT_PRE_ALARM_DURATION
+                ),
+                use_device_defaults=use_device_defaults,
+                script_pre_alarm=script_pre_alarm,
+                script_alarm=script_alarm,
+                script_post_alarm=script_post_alarm,
+                script_on_snooze=script_on_snooze,
+                script_on_dismiss=script_on_dismiss,
+                script_on_arm=script_on_arm,
+                script_on_cancel=script_on_cancel,
+                script_on_skip=script_on_skip,
+                script_fallback=script_fallback,
+                script_timeout=script_timeout,
+                script_retry_count=script_retry_count,
+            )
+            try:
+                await coordinator.async_add_alarm(new_alarm)
+            except Exception as err:
+                _LOGGER.error("Error adding alarm: %s", err, exc_info=True)
+                return self.async_abort(reason="add_alarm_failed")
+
+        # Clear the alarm data after successful submission
+        self._alarm_data = {}
+
+        # Preserve existing options (alarms are stored in the store, not options)
+        return self.async_create_entry(title="", data=self.config_entry.options)
 
     async def async_step_manage_alarms(
         self, user_input: dict[str, Any] | None = None
@@ -605,7 +600,8 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
                     except Exception as err:
                         _LOGGER.error("Error removing alarm: %s", err, exc_info=True)
                         return self.async_abort(reason="remove_alarm_failed")
-                return self.async_create_entry(title="", data={})
+                # Preserve existing options (alarms are stored in the store, not options)
+                return self.async_create_entry(title="", data=self.config_entry.options)
             elif action == "edit":
                 self._alarm_data["alarm_id"] = alarm_id
                 return await self.async_step_edit_alarm()
@@ -639,23 +635,6 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Check if use_device_defaults toggle was changed
-            current_use_defaults = user_input.get(CONF_USE_DEVICE_DEFAULTS, True)
-            previous_use_defaults = alarm.data.use_device_defaults
-
-            if current_use_defaults != previous_use_defaults:
-                # Toggle changed - update alarm data temporarily and re-show form with new schema
-                # Store current form values to preserve them
-                self._alarm_data["form_values"] = user_input
-                return self.async_show_form(
-                    step_id="edit_alarm",
-                    description_placeholders={
-                        "alarm_name": alarm.data.name,
-                        "info": "Edit alarm settings. If 'Use Device Defaults' is enabled, the alarm will use the device-level default scripts configured in Settings → Default Scripts.",
-                    },
-                    data_schema=self._build_edit_alarm_schema(alarm, current_use_defaults),
-                )
-
             # Validate alarm name
             try:
                 validated_name = validate_alarm_name(user_input[CONF_ALARM_NAME])
@@ -677,6 +656,71 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
                 CONF_MAX_SNOOZE_COUNT: (0, 10),
                 CONF_AUTO_DISMISS_TIMEOUT: (1, 180),
                 CONF_PRE_ALARM_DURATION: (0, 60),
+            }
+
+            for field, (min_val, max_val) in numeric_validations.items():
+                if field in user_input:
+                    try:
+                        user_input[field] = validate_duration(
+                            user_input[field], field, min_val, max_val
+                        )
+                    except ValidationError as err:
+                        _LOGGER.debug("Validation failed for %s: %s", field, err)
+                        errors[field] = "invalid_value"
+
+            if errors:
+                # Re-show form with errors
+                return self.async_show_form(
+                    step_id="edit_alarm",
+                    description_placeholders={
+                        "alarm_name": alarm.data.name,
+                        "info": "Edit alarm settings. If 'Use Device Defaults' is enabled, the alarm will use the device-level default scripts configured in Settings → Default Scripts.",
+                    },
+                    data_schema=self._build_edit_alarm_schema(alarm),
+                    errors=errors,
+                )
+
+            # Store form values for use in scripts step or final update
+            self._alarm_data["form_values"] = user_input
+            self._alarm_data["validated_name"] = validated_name
+            self._alarm_data["time_str"] = time_str
+
+            # Check if we need to show scripts page
+            use_device_defaults = user_input.get(CONF_USE_DEVICE_DEFAULTS, True)
+
+            if not use_device_defaults:
+                # Go to scripts configuration page
+                return await self.async_step_edit_alarm_scripts()
+
+            # Using device defaults - update the alarm directly
+            return await self._async_update_alarm()
+
+        # Show form with current alarm data
+        return self.async_show_form(
+            step_id="edit_alarm",
+            description_placeholders={
+                "alarm_name": alarm.data.name,
+                "info": "Edit alarm settings. If 'Use Device Defaults' is enabled, the alarm will use the device-level default scripts configured in Settings → Default Scripts.",
+            },
+            data_schema=self._build_edit_alarm_schema(alarm),
+        )
+
+    async def async_step_edit_alarm_scripts(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle editing alarm scripts."""
+        coordinator = self.hass.data[DOMAIN].get(self.config_entry.entry_id)
+        alarm_id = self._alarm_data.get("alarm_id")
+
+        if not coordinator or not alarm_id or alarm_id not in coordinator.alarms:
+            return self.async_abort(reason="alarm_not_found")
+
+        alarm = coordinator.alarms[alarm_id]
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            # Validate numeric fields
+            numeric_validations = {
                 CONF_SCRIPT_TIMEOUT: (1, 300),
                 CONF_SCRIPT_RETRY_COUNT: (0, 10),
             }
@@ -692,87 +736,131 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
                         errors[field] = "invalid_value"
 
             if errors:
-                # Re-show form with errors
-                use_defaults = user_input.get(CONF_USE_DEVICE_DEFAULTS, True)
                 return self.async_show_form(
-                    step_id="edit_alarm",
+                    step_id="edit_alarm_scripts",
                     description_placeholders={
                         "alarm_name": alarm.data.name,
-                        "info": "Edit alarm settings. If 'Use Device Defaults' is enabled, the alarm will use the device-level default scripts configured in Settings → Default Scripts.",
+                        "info": "Configure scripts for this alarm.",
                     },
-                    data_schema=self._build_edit_alarm_schema(alarm, use_defaults),
+                    data_schema=self._build_alarm_scripts_schema(
+                        script_pre_alarm=alarm.data.script_pre_alarm,
+                        script_alarm=alarm.data.script_alarm,
+                        script_post_alarm=alarm.data.script_post_alarm,
+                        script_on_snooze=alarm.data.script_on_snooze,
+                        script_on_dismiss=alarm.data.script_on_dismiss,
+                        script_on_arm=alarm.data.script_on_arm,
+                        script_on_cancel=alarm.data.script_on_cancel,
+                        script_on_skip=alarm.data.script_on_skip,
+                        script_fallback=alarm.data.script_fallback,
+                        script_timeout=alarm.data.script_timeout,
+                        script_retry_count=alarm.data.script_retry_count,
+                    ),
                     errors=errors,
                 )
 
-            # Update alarm with validated values
-            alarm.data.name = validated_name
-            alarm.data.time = time_str
-            alarm.data.days = user_input.get(CONF_DAYS, alarm.data.days)
-            alarm.data.snooze_duration = user_input.get(
-                CONF_SNOOZE_DURATION, alarm.data.snooze_duration
-            )
-            alarm.data.max_snooze_count = user_input.get(
-                CONF_MAX_SNOOZE_COUNT, alarm.data.max_snooze_count
-            )
-            alarm.data.auto_dismiss_timeout = user_input.get(
-                CONF_AUTO_DISMISS_TIMEOUT, alarm.data.auto_dismiss_timeout
-            )
-            alarm.data.pre_alarm_duration = user_input.get(
-                CONF_PRE_ALARM_DURATION, alarm.data.pre_alarm_duration
-            )
+            # Store script values
+            self._alarm_data["script_values"] = user_input
 
-            # Update script settings
-            use_device_defaults = user_input.get(CONF_USE_DEVICE_DEFAULTS, True)
-            alarm.data.use_device_defaults = use_device_defaults
+            # Update the alarm
+            return await self._async_update_alarm()
 
-            # If using device defaults, clear individual scripts
-            # The coordinator will use device-level defaults instead
-            if use_device_defaults:
-                alarm.data.script_pre_alarm = None
-                alarm.data.script_alarm = None
-                alarm.data.script_post_alarm = None
-                alarm.data.script_on_snooze = None
-                alarm.data.script_on_dismiss = None
-                alarm.data.script_on_arm = None
-                alarm.data.script_on_cancel = None
-                alarm.data.script_on_skip = None
-                alarm.data.script_fallback = None
-                alarm.data.script_timeout = DEFAULT_SCRIPT_TIMEOUT
-                alarm.data.script_retry_count = DEFAULT_SCRIPT_RETRY_COUNT
-            else:
-                # Update alarm-specific scripts from form
-                alarm.data.script_pre_alarm = user_input.get(CONF_SCRIPT_PRE_ALARM)
-                alarm.data.script_alarm = user_input.get(CONF_SCRIPT_ALARM)
-                alarm.data.script_post_alarm = user_input.get(CONF_SCRIPT_POST_ALARM)
-                alarm.data.script_on_snooze = user_input.get(CONF_SCRIPT_ON_SNOOZE)
-                alarm.data.script_on_dismiss = user_input.get(CONF_SCRIPT_ON_DISMISS)
-                alarm.data.script_on_arm = user_input.get(CONF_SCRIPT_ON_ARM)
-                alarm.data.script_on_cancel = user_input.get(CONF_SCRIPT_ON_CANCEL)
-                alarm.data.script_on_skip = user_input.get(CONF_SCRIPT_ON_SKIP)
-                alarm.data.script_fallback = user_input.get(CONF_SCRIPT_FALLBACK)
-                alarm.data.script_timeout = user_input.get(
-                    CONF_SCRIPT_TIMEOUT, DEFAULT_SCRIPT_TIMEOUT
-                )
-                alarm.data.script_retry_count = user_input.get(
-                    CONF_SCRIPT_RETRY_COUNT, DEFAULT_SCRIPT_RETRY_COUNT
-                )
-
-            try:
-                await coordinator.async_update_alarm(alarm.data)
-            except Exception as err:
-                _LOGGER.error("Error updating alarm: %s", err, exc_info=True)
-                return self.async_abort(reason="update_alarm_failed")
-            return self.async_create_entry(title="", data={})
-
-        # Show form with current alarm data
+        # Show scripts form with current values
         return self.async_show_form(
-            step_id="edit_alarm",
+            step_id="edit_alarm_scripts",
             description_placeholders={
                 "alarm_name": alarm.data.name,
-                "info": "Edit alarm settings. If 'Use Device Defaults' is enabled, the alarm will use the device-level default scripts configured in Settings → Default Scripts.",
+                "info": "Configure scripts for this alarm.",
             },
-            data_schema=self._build_edit_alarm_schema(alarm),
+            data_schema=self._build_alarm_scripts_schema(
+                script_pre_alarm=alarm.data.script_pre_alarm,
+                script_alarm=alarm.data.script_alarm,
+                script_post_alarm=alarm.data.script_post_alarm,
+                script_on_snooze=alarm.data.script_on_snooze,
+                script_on_dismiss=alarm.data.script_on_dismiss,
+                script_on_arm=alarm.data.script_on_arm,
+                script_on_cancel=alarm.data.script_on_cancel,
+                script_on_skip=alarm.data.script_on_skip,
+                script_fallback=alarm.data.script_fallback,
+                script_timeout=alarm.data.script_timeout,
+                script_retry_count=alarm.data.script_retry_count,
+            ),
         )
+
+    async def _async_update_alarm(self) -> FlowResult:
+        """Update an existing alarm from the stored alarm data."""
+        coordinator = self.hass.data[DOMAIN].get(self.config_entry.entry_id)
+        alarm_id = self._alarm_data.get("alarm_id")
+
+        if not coordinator or not alarm_id or alarm_id not in coordinator.alarms:
+            return self.async_abort(reason="alarm_not_found")
+
+        alarm = coordinator.alarms[alarm_id]
+        form_values = self._alarm_data.get("form_values", {})
+        script_values = self._alarm_data.get("script_values", {})
+
+        # Update alarm with validated values
+        alarm.data.name = self._alarm_data.get("validated_name", alarm.data.name)
+        alarm.data.time = self._alarm_data.get("time_str", alarm.data.time)
+        alarm.data.days = form_values.get(CONF_DAYS, alarm.data.days)
+        alarm.data.snooze_duration = form_values.get(
+            CONF_SNOOZE_DURATION, alarm.data.snooze_duration
+        )
+        alarm.data.max_snooze_count = form_values.get(
+            CONF_MAX_SNOOZE_COUNT, alarm.data.max_snooze_count
+        )
+        alarm.data.auto_dismiss_timeout = form_values.get(
+            CONF_AUTO_DISMISS_TIMEOUT, alarm.data.auto_dismiss_timeout
+        )
+        alarm.data.pre_alarm_duration = form_values.get(
+            CONF_PRE_ALARM_DURATION, alarm.data.pre_alarm_duration
+        )
+
+        # Update script settings
+        use_device_defaults = form_values.get(CONF_USE_DEVICE_DEFAULTS, True)
+        alarm.data.use_device_defaults = use_device_defaults
+
+        # If using device defaults, clear individual scripts
+        if use_device_defaults:
+            alarm.data.script_pre_alarm = None
+            alarm.data.script_alarm = None
+            alarm.data.script_post_alarm = None
+            alarm.data.script_on_snooze = None
+            alarm.data.script_on_dismiss = None
+            alarm.data.script_on_arm = None
+            alarm.data.script_on_cancel = None
+            alarm.data.script_on_skip = None
+            alarm.data.script_fallback = None
+            alarm.data.script_timeout = DEFAULT_SCRIPT_TIMEOUT
+            alarm.data.script_retry_count = DEFAULT_SCRIPT_RETRY_COUNT
+        else:
+            # Update alarm-specific scripts from form
+            alarm.data.script_pre_alarm = script_values.get(CONF_SCRIPT_PRE_ALARM)
+            alarm.data.script_alarm = script_values.get(CONF_SCRIPT_ALARM)
+            alarm.data.script_post_alarm = script_values.get(CONF_SCRIPT_POST_ALARM)
+            alarm.data.script_on_snooze = script_values.get(CONF_SCRIPT_ON_SNOOZE)
+            alarm.data.script_on_dismiss = script_values.get(CONF_SCRIPT_ON_DISMISS)
+            alarm.data.script_on_arm = script_values.get(CONF_SCRIPT_ON_ARM)
+            alarm.data.script_on_cancel = script_values.get(CONF_SCRIPT_ON_CANCEL)
+            alarm.data.script_on_skip = script_values.get(CONF_SCRIPT_ON_SKIP)
+            alarm.data.script_fallback = script_values.get(CONF_SCRIPT_FALLBACK)
+            alarm.data.script_timeout = script_values.get(
+                CONF_SCRIPT_TIMEOUT, DEFAULT_SCRIPT_TIMEOUT
+            )
+            alarm.data.script_retry_count = script_values.get(
+                CONF_SCRIPT_RETRY_COUNT, DEFAULT_SCRIPT_RETRY_COUNT
+            )
+
+        try:
+            await coordinator.async_update_alarm(alarm.data)
+        except Exception as err:
+            _LOGGER.error("Error updating alarm: %s", err, exc_info=True)
+            return self.async_abort(reason="update_alarm_failed")
+
+        # Clear the alarm data after successful submission
+        self._alarm_data = {}
+
+        # Preserve existing options (alarms are stored in the store, not options)
+        return self.async_create_entry(title="", data=self.config_entry.options)
 
     async def async_step_default_scripts(
         self, user_input: dict[str, Any] | None = None
@@ -793,12 +881,9 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
                 if value is not None and value != "":
                     updated_options[key] = value
 
-            # Save to config entry options
-            self.hass.config_entries.async_update_entry(
-                self.config_entry,
-                options=updated_options,
-            )
-            return self.async_create_entry(title="", data={})
+            # Return the updated options - OptionsFlow will save them to config_entry.options
+            # Note: async_create_entry(data=...) in OptionsFlow updates config_entry.options
+            return self.async_create_entry(title="", data=updated_options)
 
         # Get current defaults from options
         # Filter out empty strings from stored values (legacy data cleanup)
@@ -927,7 +1012,8 @@ class AlarmClockOptionsFlow(config_entries.OptionsFlow):
             coordinator = self.hass.data[DOMAIN].get(self.config_entry.entry_id)
             if coordinator:
                 await coordinator.store.async_update_settings(user_input)
-            return self.async_create_entry(title="", data={})
+            # Preserve existing options (global settings are stored in the store, not options)
+            return self.async_create_entry(title="", data=self.config_entry.options)
 
         coordinator = self.hass.data[DOMAIN].get(self.config_entry.entry_id)
         current_settings = coordinator.store.settings if coordinator else {}

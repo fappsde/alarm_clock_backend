@@ -47,12 +47,21 @@
           "max_snooze_count": "Maximum Snoozes",
           "auto_dismiss_timeout": "Auto-dismiss Timeout (minutes)",
           "pre_alarm_duration": "Pre-alarm Duration (minutes)",
-          "use_device_defaults": "Use Device Defaults",
+          "use_device_defaults": "Use Device Defaults"
+        }
+      },
+      "alarm_scripts": {
+        "title": "Alarm Scripts",
+        "description": "Configure scripts for this alarm.",
+        "data": {
           "script_pre_alarm": "Pre-alarm Script",
           "script_alarm": "Alarm Script",
           "script_post_alarm": "Post-alarm Script",
           "script_on_snooze": "On Snooze Script",
           "script_on_dismiss": "On Dismiss Script",
+          "script_on_arm": "On Arm Script",
+          "script_on_cancel": "On Cancel Script",
+          "script_on_skip": "On Skip Script",
           "script_fallback": "Fallback Script",
           "script_timeout": "Script Timeout (seconds)",
           "script_retry_count": "Script Retry Count"
@@ -82,7 +91,25 @@
           "snooze_duration": "Snooze Duration (minutes)",
           "max_snooze_count": "Maximum Snoozes",
           "auto_dismiss_timeout": "Auto-dismiss Timeout (minutes)",
-          "pre_alarm_duration": "Pre-alarm Duration (minutes)"
+          "pre_alarm_duration": "Pre-alarm Duration (minutes)",
+          "use_device_defaults": "Use Device Defaults"
+        }
+      },
+      "edit_alarm_scripts": {
+        "title": "Edit Alarm Scripts",
+        "description": "Configure scripts for this alarm.",
+        "data": {
+          "script_pre_alarm": "Pre-alarm Script",
+          "script_alarm": "Alarm Script",
+          "script_post_alarm": "Post-alarm Script",
+          "script_on_snooze": "On Snooze Script",
+          "script_on_dismiss": "On Dismiss Script",
+          "script_on_arm": "On Arm Script",
+          "script_on_cancel": "On Cancel Script",
+          "script_on_skip": "On Skip Script",
+          "script_fallback": "Fallback Script",
+          "script_timeout": "Script Timeout (seconds)",
+          "script_retry_count": "Script Retry Count"
         }
       },
       "default_scripts": {
